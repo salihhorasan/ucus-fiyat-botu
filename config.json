@@ -1,0 +1,14 @@
+[
+  {"id": 1, "kalkis": "OGU", "varis": "IST", "tarih": "2026-06-05", "hedef": 2000},
+  {"id": 2, "kalkis": "OGU", "varis": "IST", "tarih": "2026-06-06", "hedef": 2000},
+  {"id": 3, "kalkis": "OGU", "varis": "IST", "tarih": "2026-06-07", "hedef": 2000},
+  {"id": 4, "kalkis": "OGU", "varis": "SAW", "tarih": "2026-06-05", "hedef": 2000},
+  {"id": 5, "kalkis": "OGU", "varis": "SAW", "tarih": "2026-06-06", "hedef": 2000},
+  {"id": 6, "kalkis": "OGU", "varis": "SAW", "tarih": "2026-06-07", "hedef": 2000},
+  {"id": 7, "kalkis": "SZF", "varis": "IST", "tarih": "2026-06-05", "hedef": 2000},
+  {"id": 8, "kalkis": "SZF", "varis": "IST", "tarih": "2026-06-06", "hedef": 2000},
+  {"id": 9, "kalkis": "SZF", "varis": "IST", "tarih": "2026-06-07", "hedef": 2000},
+  {"id": 10, "kalkis": "SZF", "varis": "SAW", "tarih": "2026-06-05", "hedef": 2000},
+  {"id": 11, "kalkis": "SZF", "varis": "SAW", "tarih": "2026-06-06", "hedef": 2000},
+  {"id": 12, "kalkis": "SZF", "varis": "SAW", "tarih": "2026-06-07", "hedef": 2000}
+]

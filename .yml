@@ -1,0 +1,39 @@
+name: Ucus Takip ve Yonetim
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Her saat başı
+  workflow_dispatch: # Manuel çalıştırma için
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Tüm geçmişi çek ki commit atabilsin
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install fast-flights requests
+
+      - name: Run Script
+        env:
+          # GitHub Secrets'tan verileri çekip sistem değişkeni olarak ata
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          KONFIG_DOSYASI: "konfig.json"
+        run: python test_ucus.py
+
+      - name: Değişiklikleri Kaydet (Commit & Push)
+        run: |
+          git config --global user.name "UcusBot"
+          git config --global user.email "bot@github.com"
+          git add konfig.json
+          git commit -m "Telegram üzerinden liste güncellendi" || echo "Değişiklik yok"
+          git push
