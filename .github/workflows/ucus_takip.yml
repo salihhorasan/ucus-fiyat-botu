@@ -28,13 +28,13 @@ jobs:
           # GitHub Secrets'tan verileri çekip sistem değişkeni olarak ata
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-          KONFIG_DOSYASI: "konfig.json"
+          KONFIG_DOSYASI: ${{ secrets.KONFIG_DOSYASI }}
         run: python test_ucus.py
 
       - name: Değişiklikleri Kaydet (Commit & Push)
         run: |
           git config --global user.name "UcusBot"
           git config --global user.email "bot@github.com"
-          git add konfig.json
+          git add ${{ secrets.KONFIG_DOSYASI }}
           git commit -m "Telegram üzerinden liste güncellendi" || echo "Değişiklik yok"
           git push
