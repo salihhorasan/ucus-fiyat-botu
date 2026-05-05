@@ -2,7 +2,7 @@ import json
 import os
 import requests
 from dotenv import load_dotenv
-from fast_flights import get_flights, FlightData, Passengers
+from fast_flights import FlightQuery, Passengers, ShoppingOptions, create_query, get_flights
 
 load_dotenv()
 
@@ -36,7 +36,7 @@ def main():
     degisiklik_var = False
     bilgi_notu = ""
 
-    # 1. Telegram'dan gelen komutları işle (Örn: "sil 1" veya "ekle IST LHR 2026-06-15 4000")
+    # 1. Telegram'dan gelen komutları işle
     for update in updates:
         if "message" in update and str(update["message"]["chat"]["id"]) == CHAT_ID:
             text = update["message"]["text"].lower()
@@ -69,48 +69,86 @@ def main():
     rapor = "📊 <b>UÇUŞ DURUM RAPORU</b>\n\n"
     if bilgi_notu: rapor += f"{bilgi_notu}\n"
 
-    # Rotaları gruplamak için kalkış ve varış noktasına göre sıralıyoruz
     liste.sort(key=lambda x: (x['kalkis'], x['varis']))
-    
     gecerli_rota = None
 
     for r in liste:
         try:
             print(f"Aranıyor: {r['kalkis']} -> {r['varis']}")
-            sonuc = get_flights(
-                flight_data=[FlightData(date=r['tarih'], from_airport=r['kalkis'], to_airport=r['varis'])],
-                trip="one-way", seat="economy",
-                passengers=Passengers(adults=1, children=0, infants_in_seat=0, infants_on_lap=0)
+            
+            # 2. DEĞİŞİKLİK: Sorguyu önceden TL ve Türkçe olarak oluşturuyoruz
+            query = create_query(
+                flights=[
+                    FlightQuery(date=r['tarih'], from_airport=r['kalkis'], to_airport=r['varis'])
+                ],
+                trip="one-way",
+                seat="economy",
+                passengers=Passengers(adults=1),
+                language="tr",
+                currency="TRY"
             )
-            fiyat_metni = sonuc.flights[0].price if sonuc.flights else "Bulunamadı"
-            # Fiyat uygunluk kontrolü
-            durum = "🔥 UYGUN!" if "TRY" in fiyat_metni and int("".join(filter(str.isdigit, fiyat_metni))) <= r['hedef'] else "⌛ Beklemede"
+
+            # ShoppingOptions ile ucuzdan pahalıya sıralı çekiyoruz
+            sonuc = get_flights(
+                query,
+                shopping=ShoppingOptions(ranking_mode="cheapest", result_sort="price")
+            )
+
+            # 3. DEĞİŞİKLİK: Sonuçları yeni yapıya göre okuyoruz
+            if sonuc:
+                ucus_info = sonuc[0]
+                fiyat_metni = str(getattr(ucus_info, 'price', 'Bulunamadı'))
+            else:
+                ucus_info = None
+                fiyat_metni = "Bulunamadı"
+
+            # Fiyatı rakama çevirip güvenli kontrol yapıyoruz
+            temiz_fiyat_str = "".join(filter(str.isdigit, fiyat_metni))
+            temiz_fiyat = int(temiz_fiyat_str) if temiz_fiyat_str else float('inf')
+            durum = "🔥 UYGUN!" if "TRY" in fiyat_metni and temiz_fiyat <= r['hedef'] else "⌛ Beklemede"
             
             su_anki_rota = (r['kalkis'], r['varis'])
             
-            # Eğer rota değiştiyse (yeni bir şehir çiftine geçildiyse)
             if su_anki_rota != gecerli_rota:
-                # İlk rotadan sonra geliyorsa ayırıcı ekle
                 if gecerli_rota is not None:
                     rapor += "------------------\n"
-                # Rota başlığını yaz (Örn: IST ✈️ LHR)
                 rapor += f"📍 <b>{r['kalkis']} ✈️ {r['varis']}</b>\n"
                 gecerli_rota = su_anki_rota
             
-            ucus_info = sonuc.flights[0]
+            # Eğer uçuş bulunduysa bilgileri al (name yerine airlines kullanılıyor)
+            if ucus_info:
+                # 1. Havayolu listesini metne çevir (Örn: ['AJet'] -> 'AJet')
+                airlines_list = getattr(ucus_info, 'airlines', [])
+                havayolu = ", ".join(airlines_list) if airlines_list else "Bilinmiyor"
+                
+                # 2. Uçuş saatleri, ana objenin içindeki 'flights' adlı alt listede duruyor
+                if hasattr(ucus_info, 'flights') and len(ucus_info.flights) > 0:
+                    ilk_bacak = ucus_info.flights[0] # SingleFlight objesi
+                    kalkis_objesi = getattr(ilk_bacak, 'departure', None)
+                    varis_objesi = getattr(ilk_bacak, 'arrival', None)
+                else:
+                    kalkis_objesi, varis_objesi = None, None
 
-            info = {
-                "name": str(getattr(ucus_info, 'name', 'Bilinmiyor')),
-                "departure": str(getattr(ucus_info, 'departure', 'Bilinmiyor')),
-                "arrival": str(getattr(ucus_info, 'arrival', 'Bilinmiyor'))
-            }
+                # SimpleDatetime objesini "HH:MM" formatına çeviren yardımcı
+                def saat_cevir(dt_obj):
+                    try:
+                        t = getattr(dt_obj, 'time', [])
+                        if len(t) >= 2: return f"{t[0]:02d}:{t[1]:02d}"
+                        elif len(t) == 1: return f"{t[0]:02d}:00"
+                    except: pass
+                    return "--:--"
 
-            rapor += f"  🆔 <b>{r['id']}</b> | 📅 {r['tarih']} | {info['name']}\n"
-            rapor += f"  🆔 <b> {info['departure']}| {info['arrival']}</b>\n"
+                k_saat = saat_cevir(kalkis_objesi)
+                v_saat = saat_cevir(varis_objesi)
+            else:
+                havayolu, k_saat, v_saat = "Uçuş Yok", "--:--", "--:--"
+
+            rapor += f"  🆔 <b>{r['id']}</b> | 📅 {r['tarih']} | {havayolu}\n"
+            rapor += f"  🕒 <b>{k_saat} ➡️ {v_saat}</b>\n"
             rapor += f"  💰 {fiyat_metni} | 🎯 {r['hedef']} | {durum}\n\n"
             
         except Exception as e:
-            rapor += f"🆔 {r['id']}: {r['kalkis']}-{r['varis']} veri çekilemedi.\n"
+            rapor += f"🆔 {r['id']}: {r['kalkis']}-{r['varis']} veri çekilemedi. ({e})\n\n"
 
     rapor += "\n<i>Not: Rota silmek için 'sil ID' yazıp gönderebilirsiniz.</i>"
     telegram_mesaj_gonder(rapor)
